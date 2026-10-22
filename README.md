@@ -109,13 +109,13 @@ needs `"timeout": 600000` (human-paced dialog); core runs fine at defaults.
 
 | Direction | Engine | How | Needs |
 | --- | --- | --- | --- |
-| STT | local faster-whisper | CTranslate2, CPU; models cached under XDG cache; Silero VAD for the dialog's silence stop | `[stt]` extra; Python 3.14 wheel support to verify |
+| STT | local faster-whisper | CTranslate2, CPU; models cached under XDG cache; Silero VAD for the dialog's silence stop; whisper.cpp (pacman 1.9.5) is the alternative local engine | `[stt]` extra; cp314 wheels verified — see `research/engine-availability.md` |
 | STT | cloud Groq | OpenAI-compatible `/audio/transcriptions`, `whisper-large-v3-turbo` | `GROQ_API_KEY` |
-| TTS | local Piper | piper-tts + onnxruntime, per-language voice files | `[tts]` extra; voice download on first use |
+| TTS | local Piper | piper-tts + onnxruntime, per-language voice files | `[tts]` extra; voice download on first use; cp314 wheels verified |
 | TTS | cloud Edge TTS | free Microsoft neural voices, no key, unofficial | network |
 | TTS | cloud OpenAI-compatible | generic `/audio/speech` adapter — OpenAI, Groq PlayAI, or any compatible endpoint | `LISTEN_N_SPEAK_TTS_BASE_URL` + `LISTEN_N_SPEAK_TTS_API_KEY` |
 | TTS | espeak-ng | system binary, robotic, zero deps | pacman install |
-| TTS | local Kokoro (deferred) | **not implemented in v1** — weights via `scripts/download-kokoro-model.sh`, to be evaluated **outside this VM** (kokoro-onnx supports Python ≤3.13; this VM has only 3.14) | future candidate |
+| TTS | local Kokoro (deferred) | **not implemented in v1** — weights via `scripts/download-kokoro-model.sh`, to be evaluated **outside this VM** (kokoro-onnx requires Python <3.14, cap confirmed on PyPI; this VM has only 3.14) | future candidate |
 
 Selection per call via `engine=`, default via env, fallback chain after
 failure — identical semantics to look-n-see's OCR dispatcher. Live typing in

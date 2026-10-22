@@ -14,8 +14,8 @@ of README gate the spec; resolve them with the user before implementing.
 - Use `CONTEXT.md` terms exactly: audio, transcript, utterance, transcription,
   synthesis, engine, voice. They are not synonyms for anything else.
 - Python 3.10+. No Node/Cargo toolchains on this workstation; system Python is
-  3.14 — verify wheel availability for local engines (CTranslate2, onnxruntime)
-  before committing to one.
+  3.14 — local-engine wheel availability was verified 2026-10-22 (see
+  `research/engine-availability.md`); kokoro-onnx hard-caps at Python <3.14.
 - Dependency-light: `mcp>=2` + `httpx` baseline — parity with look-n-see's
   `pyproject.toml`. Local engines go behind extras (`[stt]`, `[tts]`).
   Tests use stdlib `unittest`, zero dev deps.
@@ -38,8 +38,9 @@ of README gate the spec; resolve them with the user before implementing.
 - Config via environment variables (`LISTEN_N_SPEAK_*`) with sane defaults;
   secrets from env only, never hardcoded or committed.
 - Workstation audio facts: PipeWire present (sinks, sources, monitor),
-  arecord/aplay/ffmpeg/ffprobe/parecord/pw-record installed; sox, espeak-ng,
-  piper, whisper binaries absent (install via pacman when an engine needs one).
+  arecord/aplay/ffmpeg/ffprobe/parecord/pw-record installed; sox absent.
+  Pacman offers: espeak-ng 1.52, whisper.cpp 1.9.5, piper 0.8, tk 5.7 MiB
+  (tk fixes the VM's broken tkinter — needed by the listen dialog).
 
 ## Workflow
 
