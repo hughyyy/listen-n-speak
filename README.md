@@ -64,6 +64,8 @@ stateless.
    (return the transcript to the calling agent). Closing the window counts as
    a dismissal.
 
+The dialog records the host **microphone only** (`LISTEN_N_SPEAK_INPUT` picks
+which mic; the PipeWire monitor — system output — is out of scope for v1).
 Graceful degradation: with no local streaming engine the dialog records with
 silence detection via ffmpeg levels and batch-transcribes at the end (cloud
 engines usable; live typing becomes a "recording…" state); with no capture
@@ -157,7 +159,7 @@ manual/scripted and is not part of the offline unittest suite.
 | `LISTEN_N_SPEAK_STT_FALLBACKS` | engine-dependent | fallback chain tried after the default fails |
 | `LISTEN_N_SPEAK_TTS_FALLBACKS` | engine-dependent | same, for synthesis |
 | `LISTEN_N_SPEAK_OUTPUT_DIR` | XDG cache or tmp | where synthesized/captured files land |
-| `LISTEN_N_SPEAK_INPUT` | system default | capture source for the dialog |
+| `LISTEN_N_SPEAK_INPUT` | system default | which microphone the dialog records |
 | `TRANSCRIBE_ENABLED` / `SPEAK_ENABLED` / `LISTEN_ENABLED` | `1` | tool registration gates (release variants) |
 
 Full set finalized after the open questions are answered.
@@ -206,9 +208,7 @@ tokens from OMP's credential store — same recipe as look-n-see):
 
 ## Open design questions (gating the spec)
 
-1. **`speak` delivery** — synthesize + play, synthesize-only, or both tools?
-2. **Capture source** — host mic, monitor (what the machine plays), both?
-3. **Formats** — WAV-only policy, or WAV default + optional mp3/ogg via ffmpeg?
-4. **Language policy** — English-only catalog in v1, or multilingual param
+1. **Formats** — WAV-only policy, or WAV default + optional mp3/ogg via ffmpeg?
+2. **Language policy** — English-only catalog in v1, or multilingual param
    surface from day one?
-5. **Non-goals** — confirm the list above as v1 non-goals.
+3. **Non-goals** — confirm the list above as v1 non-goals.
