@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -179,6 +180,9 @@ def _register_listen(mcp: MCPServer, cfg: config_mod.Config) -> None:
         ]
         if engine:
             command += ["--engine", engine]
+        if os.environ.get("LISTEN_N_SPEAK_DIALOG_AUTO_SEND"):
+            # Smoke hook (scripts/dialog_smoke.py): no input injection needed.
+            command.append("--auto-send")
         try:
             proc = subprocess.run(
                 command, capture_output=True, text=True, timeout=limit + 30

@@ -30,11 +30,16 @@ Fourth in the collection (look-n-see, scrape-n-search, store-n-recall).
 - **Implemented end to end.** 60 offline tests pass; live round-trip
   (piper → faster-whisper) matched the spoken sentence at **100% word
   similarity** with playback working; `scripts/mcp_smoke.py` spawned the
-  server over stdio and exercised all four tools (`listen` correctly returns
-  the tkinter-unavailable error on this VM).
+  server over stdio and exercised all four tools.
+- **Dialog verified for real (2026-10-23, after the `tk` install):**
+  `scripts/dialog_smoke.py` synthesizes a sentence, plays it into a PipeWire
+  null sink, points capture at that monitor source, and drives `listen`
+  through recording → silence auto-stop (8.3 s capture) → final transcript →
+  auto-send; the MCP call returned a **100% matching transcript**.
 - Benchmarks (README table): piper 1.38–1.57 s for 3–7 s speech; edge
-  1.57–2.01 s; whisper base int8 RTF 0.05–0.48, WER 0–7.7%; dialog live
-  refresh 1.35–1.54 s per rolling window (~3 s UI cadence).
+  1.57–2.01 s; espeak 0.05 s but 7.7–33.3% WER when transcribed (robotic);
+  whisper base int8 RTF 0.05–0.48, WER 0–7.7%; dialog live refresh
+  1.35–1.54 s per rolling window (~3 s UI cadence).
 - Registered with OMP: `~/.omp/agent/mcp.json` → `listen-n-speak` (stdio,
   `/mnt/shared/Source/listen-n-speak/.venv/bin/listen-n-speak`,
   `timeout: 600000`). **Restart the OMP client (or `/mcp reload`) to load
@@ -47,12 +52,11 @@ Fourth in the collection (look-n-see, scrape-n-search, store-n-recall).
 - Python 3.14.7 only; cp314 wheels confirmed for ctranslate2 4.8.3,
   onnxruntime 1.31.0, piper-tts 1.8.0 (abi3), av 19 (abi3), tokenizers
   (abi3) — `research/engine-availability.md`.
-- `tk` is **not installed** (sudo is password-locked): the dialog cannot open
-  here; `listen` reports `tkinter unavailable … pacman -S tk`. All dialog
-  logic (capture, silence stop, IPC, final transcription) is covered by
-  tests with mocks.
-- `espeak-ng` is **not installed** (same reason): the espeak engine errors
-  with an install hint; it is the documented emergency floor.
+- `tk` **installed** (user-admin action, 2026-10-23): tkinter 8.6 imports
+  and the dialog was verified end to end via a null sink.
+- `espeak-ng` **installed** (1.52.0): synthesis takes ~0.05 s, but
+  intelligibility when transcribed is poor (7.7–33.3% WER), so it remains
+  the zero-dep floor only.
 - `GROQ_API_KEY` absent → the groq STT path is coded but unexercised.
   `LISTEN_N_SPEAK_TTS_BASE_URL`/`_API_KEY` absent → the `openai` TTS path is
   unexercised.
@@ -68,6 +72,7 @@ cd /mnt/shared/Source/listen-n-speak
 .venv/bin/python -m unittest discover -s tests -q   # offline suite (60)
 .venv/bin/python scripts/live_smoke.py              # piper → whisper → aplay
 .venv/bin/python scripts/mcp_smoke.py               # stdio MCP, all tools
+.venv/bin/python scripts/dialog_smoke.py            # listen dialog, real audio
 .venv/bin/listen-n-speak                            # stdio MCP server
 ```
 
@@ -105,14 +110,13 @@ cd /mnt/shared/Source/listen-n-speak
 
 ## Open items / next steps
 
-- **Dialog GUI**: `pacman -S tk` (needs an admin) then exercise `listen`
-  end-to-end: prompt renders, record button starts capture, live words
-  appear, 5 s silence stops, Clear/Send behave, dismissal returns
-  `{"text": null, "reason": "dismissed"}`.
-- **espeak engine**: `pacman -S espeak-ng`, then benchmark it and confirm the
-  fallback floor works.
 - **Groq STT**: set `GROQ_API_KEY` and run `bench_stt.py --engines
   faster-whisper,groq` for the cloud comparison.
+- **OpenAI-compatible TTS**: point `LISTEN_N_SPEAK_TTS_BASE_URL`/`_API_KEY`
+  at a provider and benchmark it; the adapter is coded and unit-tested.
+- **Live dialog by hand** (optional): run `listen` from an OMP session to
+  confirm the interactive button path and live typing feel; automation covers
+  the flow, and the literal mouse click is the only untested step.
 - **Listening ranking**: blind-rank `benchmarks/results/tts-*/` and record
   the verdict in README before changing the TTS default.
 - **Live typists**: if 3 s cadence is too slow, shorten `LIVE_REFRESH_S`

@@ -58,9 +58,12 @@ implemented and verified 2026-10-23** — requirements in `BRIEF.md`, design in
 
 - `python -m unittest discover -s tests -q` — the offline suite (60 tests,
   zero dev deps; must stay green).
-- `python scripts/mcp_smoke.py` — spawns the server over stdio and exercises
-  all four tools; `listen` is expected to fail with a clear tkinter error on
-  hosts without `tk`.
+- `python scripts/mcp_smoke.py` — spawns the server over stdio and checks
+  `transcribe`/`speak`/`synthesize` plus the registered `listen` tool
+  (`listen` itself is not called: it pops a window and waits for a human).
+- `python scripts/dialog_smoke.py` — drives `listen` end to end without a
+  human: synthesizes speech, plays it into a PipeWire null sink, points
+  capture at that monitor, and asserts the returned transcript.
 - `python scripts/live_smoke.py` — real piper → faster-whisper → aplay
   round-trip (weights cached under `~/.cache/listen-n-speak`).
 - Never pass a file path to faster-whisper: PyAV 14+ renamed `av.open`'s

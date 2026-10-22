@@ -70,12 +70,10 @@ async def run() -> int:
             if "error" in spoken:
                 failures.append(f"speak failed: {spoken['error']}")
 
-            heard_dialog = payload(
-                await session.call_tool("listen", {"prompt": "Say something (smoke test)."})
-            )
-            print("listen:", heard_dialog)
-            if "error" not in heard_dialog:
-                failures.append("listen unexpectedly succeeded without a display/tk")
+            # `listen` opens a real window and blocks for a human, so it is
+            # not called here — `scripts/dialog_smoke.py` drives it with real
+            # audio via a null sink. Registration is covered above.
+            print("listen: registered (flow covered by scripts/dialog_smoke.py)")
 
     if failures:
         print("\nFAIL:")

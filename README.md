@@ -8,12 +8,12 @@ dialog where the human answers the agent by voice. Fourth in the collection —
 (web), [store-n-recall](../store-n-recall) (project memory), listen-n-speak
 (speech).
 
-> **Status: implemented and verified 2026-10-23** — 60 offline tests,
-> live round-trip (piper → faster-whisper, 100% match), and the stdio MCP
-> surface exercised end to end. Known gaps on this VM: `tk` is not installed
-> (the `listen` dialog reports a clear error until `pacman -S tk`), and the
-> Groq / espeak / OpenAI-compatible engines are coded but unexercised here
-> (no key / no root / no credentials).
+> **Status: implemented and verified 2026-10-23** — 60 offline tests, live
+> round-trip (piper → faster-whisper, 100% match), the stdio MCP surface
+> exercised end to end, and the `listen` dialog driven autonomously with real
+> audio (null-sink capture, 100% transcript match). Remaining gaps: Groq and
+> the OpenAI-compatible TTS route need credentials; TTS listening quality is
+> not yet ranked.
 
 ## The idea
 
@@ -154,15 +154,18 @@ results (`benchmarks/results/`, gitignored); `research/` holds tradeoff notes.
 | --- | --- | --- |
 | TTS | `piper` (local) | 1.38–1.57 s synthesis for 3.0–7.2 s audio; 129–310 KiB WAV |
 | TTS | `edge` (cloud) | 1.57–2.01 s for 4.0–10.2 s audio (incl. mp3→wav transcode); 185–480 KiB |
+| TTS | `espeak` (local) | **0.05 s** for 3.2–7.8 s audio; 137–335 KiB WAV |
 | STT | `faster-whisper` base int8 | RTF 0.05–0.48; WER 0–7.7% (one miss: the token "faster-whisper" in a technical sentence) |
 | STT (dialog) | `faster-whisper` chunked | 1.35–1.54 s per rolling-window refresh (5–30 s windows) → live text updates roughly every 3 s |
 
-Not exercised here, and why: `groq` (no `GROQ_API_KEY`), `espeak`
-(no root to `pacman -S espeak-ng`), `openai` (no endpoint/credentials),
-Kokoro (deferred by design; `scripts/download-kokoro-model.sh` is for
-out-of-VM evaluation). Listening quality is subjective and **not** yet ranked
-— rank the `benchmarks/results/tts-*/` files blind and record the verdict
-here before changing a TTS default.
+espeak's speed is real, but whisper transcribes its robotic voice at
+7.7–33.3% WER versus 0–7.7% for piper/edge audio — it stays the emergency
+floor, never the default. Not exercised here, and why: `groq` (no
+`GROQ_API_KEY`), `openai` (no endpoint/credentials), Kokoro (deferred by
+design; `scripts/download-kokoro-model.sh` is for out-of-VM evaluation).
+Listening quality is subjective and **not** yet ranked — rank the
+`benchmarks/results/tts-*/` files blind and record the verdict here before
+changing a TTS default.
 
 Verdict so far: the provisional defaults stand — `faster-whisper` (offline,
 RTF ≤ 0.5, WER ≤ 8%) and `piper` (offline, sub-2 s synthesis) are both good
@@ -207,6 +210,11 @@ or `arecord` (dialog capture), `aplay` or `ffplay` (playback), and `tk`
 (dialog GUI — `pacman -S tk`; `listen` reports a clear error without it).
 `espeak-ng` is optional (emergency TTS floor).
 
+**Note:** `listen` opens a real, always-on-top window on the host display and
+blocks until the human clicks Send or closes it — that is the contract, not a
+bug. `scripts/dialog_smoke.py` drives it without a human by routing
+synthesized speech through a PipeWire null sink.
+
 ### Development
 
 ```bash
@@ -214,6 +222,7 @@ or `arecord` (dialog capture), `aplay` or `ffplay` (playback), and `tk`
 .venv/bin/python scripts/live_smoke.py              # piper → whisper → playback
 .venv/bin/python scripts/mcp_smoke.py               # stdio MCP: all four tools
 .venv/bin/python benchmarks/bench_tts.py            # latency/size per engine
+.venv/bin/python scripts/dialog_smoke.py            # listen dialog, real audio
 .venv/bin/python benchmarks/bench_stt.py            # WER/RTF per engine
 ```
 

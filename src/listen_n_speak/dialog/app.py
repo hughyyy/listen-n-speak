@@ -49,6 +49,7 @@ class Dialog:
         self.audio_path: Path | None = None
         self.duration_s: float | None = None
         self.engine: str | None = None
+        self.auto_send = bool(getattr(args, "auto_send", False))
         self._build()
         self.root.protocol("WM_DELETE_WINDOW", self._dismiss)
 
@@ -95,6 +96,9 @@ class Dialog:
     def run(self) -> int:
         self.root.lift()
         self.root.after(120, self._poll)
+        if self.auto_send:
+            # Smoke hook: acts as if the record button were clicked.
+            self.root.after(400, self._start_recording)
         self.root.mainloop()
         return 0
 
@@ -224,6 +228,25 @@ class Dialog:
         self.live_stop.set()
         self.root.destroy()
 
+    def _auto_finalize(self) -> None:
+        """Smoke mode: send the transcript (or an empty result) immediately."""
+        text = self._text_value()
+        if text:
+            self._send()
+            return
+        ipc.write_result(
+            self.out_path,
+            {
+                "text": "",
+                "audio": str(self.audio_path) if self.audio_path else None,
+                "duration_s": round(self.duration_s, 2) if self.duration_s else None,
+                "engine": self.engine or "unknown",
+            },
+        )
+        self.sent = True
+        self.live_stop.set()
+        self.root.destroy()
+
     # -- UI pump ---------------------------------------------------------
     def _poll(self) -> None:
         try:
@@ -243,6 +266,8 @@ class Dialog:
                         self._set_status(
                             "No speech recognized — press Record to try again."
                         )
+                    if self.auto_send:
+                        self._auto_finalize()
                 elif kind == "final_error":
                     self.live_stop.set()
                     self._set_status(f"Transcription failed: {payload}")
@@ -265,6 +290,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-s", type=float, default=None)
     parser.add_argument("--engine", default=None)
     parser.add_argument("--model", default=None)
+    # Smoke hook for hosts without input-injection tools: start recording
+    # immediately and send the transcript when recording stops.
+    parser.add_argument("--auto-send", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
     cfg = load_config()
