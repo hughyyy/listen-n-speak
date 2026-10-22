@@ -118,7 +118,28 @@ needs `"timeout": 600000` (human-paced dialog); core runs fine at defaults.
 Selection per call via `engine=`, default via env, fallback chain after
 failure — identical semantics to look-n-see's OCR dispatcher. Live typing in
 the `listen` dialog requires a streaming-capable local engine (faster-whisper
-chunked transcription); cloud engines only serve batch transcription.
+chunked transcription); cloud engines only serve batch transcription. Defaults
+are set from benchmark evidence, not assertion (see Benchmarks).
+
+## Benchmarks
+
+Engine defaults are decided by evidence, not assertion — the same discipline
+as look-n-see's vision-model sweep. `benchmarks/` holds the scripts and dated
+results; `research/` holds tradeoff notes. Both paths are benchmarked before
+they are relied on:
+
+- **STT batch** (`transcribe`): latency, accuracy (WER against reference
+  transcripts), cost per call — local (faster-whisper, whisper.cpp as
+  alternative) vs cloud (Groq), same recordings through both.
+- **STT dialog** (`listen`): chunked-transcription real-time factor on CPU,
+  partial-transcript latency (how quickly words appear), silence-stop
+  reliability at the 5 s threshold.
+- **TTS**: synthesis latency, output size, and a human listening ranking on a
+  fixed set of sample texts (announcement, technical sentence with code-like
+  tokens, paragraph).
+
+Results land as a summary table in this README. The benchmark suite is
+manual/scripted and is not part of the offline unittest suite.
 
 ## Configuration (draft)
 
@@ -178,13 +199,12 @@ tokens from OMP's credential store — same recipe as look-n-see):
 
 ## Open design questions (gating the spec)
 
-1. **STT default engine** — offline-first (faster-whisper), cloud-first
-   (Groq), or pluggable with one as default?
-2. **TTS default engine** — Piper (offline), Kokoro (quality), Edge TTS
-   (no-key cloud), cloud API (keyed), or espeak-ng (zero-dep fallback)?
-3. **`speak` delivery** — synthesize + play, synthesize-only, or both tools?
-4. **Capture source** — host mic, monitor (what the machine plays), both?
-5. **Formats** — WAV-only policy, or WAV default + optional mp3/ogg via ffmpeg?
-6. **Language policy** — English-only catalog in v1, or multilingual param
+1. **TTS engine slate** — which engines to implement and benchmark for v1
+   (Piper, Kokoro, Edge TTS, keyed cloud API, espeak-ng); the default is set
+   by benchmark results, not by me.
+2. **`speak` delivery** — synthesize + play, synthesize-only, or both tools?
+3. **Capture source** — host mic, monitor (what the machine plays), both?
+4. **Formats** — WAV-only policy, or WAV default + optional mp3/ogg via ffmpeg?
+5. **Language policy** — English-only catalog in v1, or multilingual param
    surface from day one?
-7. **Non-goals** — confirm the list above as v1 non-goals.
+6. **Non-goals** — confirm the list above as v1 non-goals.

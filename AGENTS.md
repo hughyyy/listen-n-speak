@@ -46,6 +46,8 @@ of README gate the spec; resolve them with the user before implementing.
   look-n-see, and keep them in sync with decisions made during implementation.
 - Requirements questions go to the user one at a time, each framed with its
   problem context, options, and recommendation — never batched.
+- Engine defaults are set from benchmark evidence (see Benchmarks in README),
+  not assertion — same discipline as look-n-see's model sweep.
 - One commit per logical change; conventional commits, imperative subject.
   Docs-only changes say so.
 
