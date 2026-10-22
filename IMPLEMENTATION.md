@@ -5,6 +5,10 @@
 A stdio MCP server giving agents transcription, synthesis/playback, and a
 human-in-the-loop listening dialog. See `BRIEF.md` for requirements.
 
+**Status: implemented 2026-10-23** — all eight phases landed; 60 offline
+tests, live round-trip and stdio MCP smoke pass. Remaining gaps are
+environmental (see Verification).
+
 ## Stack
 
 - Python 3.10+ (3.14.7 is the only interpreter on this workstation)
@@ -87,8 +91,11 @@ see canonical files. Testable with a tiny generated wav + ffprobe mocks.
 ### STT dispatcher (`stt.py`)
 `transcribe(wav_path, engine, language, model) → dict`. Engines:
 - `faster-whisper`: lazy import; `WhisperModel` cached per process (per
-  model tier); `language=None` → autodetect; joins segments, returns text +
-  detected language + duration.
+  model tier). **Reads the WAV with stdlib `wave` + numpy and passes a
+  float32 array** — passing a path makes faster-whisper decode through PyAV,
+  whose `av.open` signature changed in PyAV 14+ (faster-whisper 1.2.1 then
+  fails with `unexpected keyword argument 'metadata_errors'`). The array
+  path skips PyAV entirely and matches our canonical 16 kHz mono input.
 - `groq`: httpx multipart `POST {GROQ_BASE}/audio/transcriptions` with the
   wav file, `model=whisper-large-v3-turbo`, optional `language`;
   `GROQ_API_KEY` required or a clear error.
@@ -174,22 +181,32 @@ stabilizes; `LICENSE` choice pending user decision, like look-n-see's.
 GitHub repo: `github.com/hughyyy/listen-n-speak` — exists (2026-10-22);
 nothing published to PyPI.
 
-## Verification
+## Verification (results, 2026-10-23)
 
-- Offline: `python -m compileall`; `python -m unittest discover -s tests
-  -q` (input parsing, config + variants, dispatchers + engines with mocked
-  deps, dialog IPC + silence logic with mocked capture, server registration
-  incl. gating). The server must start and register tools with no engines,
-  models, or keys present.
-- Live (manual): `scripts/live_smoke.py` — transcribe a sample wav
-  (faster-whisper + groq), synthesize a line (piper + edge + espeak),
-  `speak` it through the sink, one `listen` dialog session end-to-end.
-- Harness: `/mcp test` + real in-session tool calls from OMP.
-- Benchmarks: STT batch (WER / latency / cost), dialog (RTF / partial
-  latency / silence reliability), TTS (latency / size / listening ranking) —
-  verdicts recorded in README; defaults updated to match.
+- Offline: `python -m unittest discover -s tests -q` → **60 tests pass**
+  (input triple + ffmpeg normalization, config/variants, dispatchers with
+  mocked engines, silence detection + capture command + recording with a
+  fake subprocess, dialog IPC, server registration/gating, tool behavior).
+  The server starts and registers tools with no engines, models, or keys
+  present.
+- Live round-trip: `scripts/live_smoke.py` → piper synthesized 2.75 s of
+  audio, faster-whisper returned the sentence at **100% word similarity**,
+  aplay played it (6 s total, weights cached).
+- Harness-facing: `scripts/mcp_smoke.py` spawns the server over stdio → four
+  tools listed; `synthesize` → `transcribe` (data URI) → `speak` (played:
+  true) all pass; `listen` returns the specified clear error on this VM
+  (`tkinter unavailable … pacman -S tk`).
+- Benchmarks: `bench_tts.py` + `bench_stt.py` (numbers in README). Piper
+  1.38–1.57 s for 3–7 s of speech; edge 1.57–2.01 s; whisper base int8 RTF
+  0.05–0.48, WER 0–7.7%; dialog live refresh 1.35–1.54 s per window.
+- Not exercised here: `groq` (no key), `espeak` (needs root to install),
+  `openai` (no credentials), Kokoro (deferred, out-of-VM).
+- Playback env note: MCP clients that whitelist the child environment drop
+  `XDG_RUNTIME_DIR`, which breaks aplay ("Host is down"); `play_file`
+  restores `/run/user/<uid>` when absent. OMP passes the session env, so
+  this is a safety net rather than a requirement.
 
-## Phases (each ends with its tests green + a commit)
+## Phases (all complete 2026-10-23; each ended with green tests + a commit)
 
 1. **Scaffold** — `pyproject.toml` (extras, console script), `config.py`,
    `server.py` skeleton; offline tests pass (registration with all gates

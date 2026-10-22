@@ -8,9 +8,12 @@ dialog where the human answers the agent by voice. Fourth in the collection —
 (web), [store-n-recall](../store-n-recall) (project memory), listen-n-speak
 (speech).
 
-> **Status: design settled (2026-10-22)** — all open questions resolved with
-> the user; requirements live in `BRIEF.md`, design + release plan in
-> `IMPLEMENTATION.md`. Implementation not started.
+> **Status: implemented and verified 2026-10-23** — 60 offline tests,
+> live round-trip (piper → faster-whisper, 100% match), and the stdio MCP
+> surface exercised end to end. Known gaps on this VM: `tk` is not installed
+> (the `listen` dialog reports a clear error until `pacman -S tk`), and the
+> Groq / espeak / OpenAI-compatible engines are coded but unexercised here
+> (no key / no root / no credentials).
 
 ## The idea
 
@@ -143,33 +146,45 @@ are set from benchmark evidence, not assertion (see Benchmarks).
 
 Engine defaults are decided by evidence, not assertion — the same discipline
 as look-n-see's vision-model sweep. `benchmarks/` holds the scripts and dated
-results; `research/` holds tradeoff notes. Both paths are benchmarked before
-they are relied on:
+results (`benchmarks/results/`, gitignored); `research/` holds tradeoff notes.
 
-- **STT batch** (`transcribe`): latency, accuracy (WER against reference
-  transcripts), cost per call — local (faster-whisper, whisper.cpp as
-  alternative) vs cloud (Groq), same recordings through both.
-- **STT dialog** (`listen`): chunked-transcription real-time factor on CPU,
-  partial-transcript latency (how quickly words appear), silence-stop
-  reliability at the 5 s threshold.
-- **TTS**: synthesis latency, output size, and a human listening ranking on a
-  fixed set of sample texts (announcement, technical sentence with code-like
-  tokens, paragraph). Kokoro is benchmarked only after its weights are
-  evaluated outside this VM (see `scripts/download-kokoro-model.sh`).
+**Measured 2026-10-23** (this workstation, synthesized speech, Python 3.14):
 
-Results land as a summary table in this README. The benchmark suite is
-manual/scripted and is not part of the offline unittest suite.
+| Direction | Engine | Result |
+| --- | --- | --- |
+| TTS | `piper` (local) | 1.38–1.57 s synthesis for 3.0–7.2 s audio; 129–310 KiB WAV |
+| TTS | `edge` (cloud) | 1.57–2.01 s for 4.0–10.2 s audio (incl. mp3→wav transcode); 185–480 KiB |
+| STT | `faster-whisper` base int8 | RTF 0.05–0.48; WER 0–7.7% (one miss: the token "faster-whisper" in a technical sentence) |
+| STT (dialog) | `faster-whisper` chunked | 1.35–1.54 s per rolling-window refresh (5–30 s windows) → live text updates roughly every 3 s |
+
+Not exercised here, and why: `groq` (no `GROQ_API_KEY`), `espeak`
+(no root to `pacman -S espeak-ng`), `openai` (no endpoint/credentials),
+Kokoro (deferred by design; `scripts/download-kokoro-model.sh` is for
+out-of-VM evaluation). Listening quality is subjective and **not** yet ranked
+— rank the `benchmarks/results/tts-*/` files blind and record the verdict
+here before changing a TTS default.
+
+Verdict so far: the provisional defaults stand — `faster-whisper` (offline,
+RTF ≤ 0.5, WER ≤ 8%) and `piper` (offline, sub-2 s synthesis) are both good
+enough to be defaults; `edge` stays the no-key quality fallback. The benchmark
+suite is manual/scripted and is not part of the offline unittest suite.
 
 ## Configuration
 
 | Variable | Default | Purpose |
-| --- | --- | --- |
-| `LISTEN_N_SPEAK_STT_ENGINE` | — | default STT engine |
-| `LISTEN_N_SPEAK_TTS_ENGINE` | — | default TTS engine |
-| `LISTEN_N_SPEAK_STT_FALLBACKS` | engine-dependent | fallback chain tried after the default fails |
-| `LISTEN_N_SPEAK_TTS_FALLBACKS` | engine-dependent | same, for synthesis |
-| `LISTEN_N_SPEAK_OUTPUT_DIR` | XDG cache or tmp | where synthesized/captured files land |
+| `LISTEN_N_SPEAK_STT_ENGINE` | `faster-whisper` | default STT engine |
+| `LISTEN_N_SPEAK_STT_MODEL` | `base` | whisper tier (weights cached under `LISTEN_N_SPEAK_MODELS_DIR`) |
+| `LISTEN_N_SPEAK_STT_FALLBACKS` | `groq` | chain tried after the default fails |
+| `LISTEN_N_SPEAK_TTS_ENGINE` | `piper` | default TTS engine |
+| `LISTEN_N_SPEAK_TTS_FALLBACKS` | `edge espeak` | same, for synthesis |
+| `LISTEN_N_SPEAK_TTS_VOICE` | engine default | voice id or Piper voice name |
+| `LISTEN_N_SPEAK_TTS_MODEL` | `gpt-4o-mini-tts` | model for the `openai` engine |
+| `LISTEN_N_SPEAK_TTS_BASE_URL` / `LISTEN_N_SPEAK_TTS_API_KEY` | — | OpenAI-compatible `/audio/speech` endpoint |
+| `LISTEN_N_SPEAK_OUTPUT_DIR` | `~/.cache/listen-n-speak/audio` | synthesized/captured files |
+| `LISTEN_N_SPEAK_MODELS_DIR` | `~/.cache/listen-n-speak/models` | whisper/piper weights |
 | `LISTEN_N_SPEAK_INPUT` | system default | which microphone the dialog records |
+| `LISTEN_N_SPEAK_SILENCE_S` / `LISTEN_N_SPEAK_MAX_S` | `5` / `300` | dialog defaults (params override) |
+| `GROQ_API_KEY` | — | groq STT |
 | `TRANSCRIBE_ENABLED` / `SPEAK_ENABLED` / `LISTEN_ENABLED` | `1` | tool registration gates (release variants) |
 
 Finalized 2026-10-22 — all open design questions resolved with the user.
@@ -187,10 +202,27 @@ python3 -m venv .venv
 .venv/bin/listen-n-speak
 ```
 
+Prerequisites: `ffmpeg`/`ffprobe` (normalization, transcoding), `parecord`
+or `arecord` (dialog capture), `aplay` or `ffplay` (playback), and `tk`
+(dialog GUI — `pacman -S tk`; `listen` reports a clear error without it).
+`espeak-ng` is optional (emergency TTS floor).
+
+### Development
+
+```bash
+.venv/bin/python -m unittest discover -s tests -q   # offline suite (60 tests)
+.venv/bin/python scripts/live_smoke.py              # piper → whisper → playback
+.venv/bin/python scripts/mcp_smoke.py               # stdio MCP: all four tools
+.venv/bin/python benchmarks/bench_tts.py            # latency/size per engine
+.venv/bin/python benchmarks/bench_stt.py            # WER/RTF per engine
+```
+
 ### Register with Oh My Pi
 
 Add to `~/.omp/agent/mcp.json` (adjust paths; `!` env indirection resolves
-tokens from OMP's credential store — same recipe as look-n-see):
+tokens from OMP's credential store — same recipe as look-n-see). Keep
+`"timeout": 600000` for the full variant: `listen` is human-paced and the
+harness default (30 s) would kill a normal dialog.
 
 ```json
 {

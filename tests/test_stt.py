@@ -82,3 +82,43 @@ class ChainTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WavSampleTests(unittest.TestCase):
+    def test_reads_canonical_wav_as_float_samples(self):
+        import math
+        import struct
+        import tempfile
+        import wave
+
+        from listen_n_speak.stt import _read_wav_samples
+
+        path = Path(tempfile.mkdtemp(prefix="lns-wav-")) / "tone.wav"
+        with wave.open(str(path), "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(16000)
+            handle.writeframes(
+                b"".join(
+                    struct.pack("<h", int(10000 * math.sin(2 * math.pi * 440 * i / 16000)))
+                    for i in range(1600)
+                )
+            )
+        samples = _read_wav_samples(path)
+        self.assertEqual(len(samples), 1600)
+        self.assertAlmostEqual(float(abs(samples).max()), 10000 / 32768, places=3)
+
+    def test_rejects_non_16k_wav(self):
+        import tempfile
+        import wave
+
+        from listen_n_speak.stt import _read_wav_samples
+
+        path = Path(tempfile.mkdtemp(prefix="lns-wav-")) / "44k.wav"
+        with wave.open(str(path), "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(44100)
+            handle.writeframes(b"\x00\x00" * 4410)
+        with self.assertRaises(SttError):
+            _read_wav_samples(path)

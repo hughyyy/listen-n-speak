@@ -5,9 +5,9 @@
 MCP server giving agents speech I/O: transcription (audio → text), synthesis
 (text → audio), and a human-in-the-loop listening dialog. Fourth in the
 collection (look-n-see, scrape-n-search, store-n-recall). **Status:
-requirements settled 2026-10-22; implementation not started** — requirements
-in `BRIEF.md`, design + phased plan in `IMPLEMENTATION.md`, user-facing
-surface in `README.md`, vocabulary in `CONTEXT.md`.
+implemented and verified 2026-10-23** — requirements in `BRIEF.md`, design in
+`IMPLEMENTATION.md`, user-facing surface in `README.md`, vocabulary in
+`CONTEXT.md`, current state + gaps in `HANDOVER.md`.
 
 ## Conventions
 
@@ -56,10 +56,13 @@ surface in `README.md`, vocabulary in `CONTEXT.md`.
 
 ## Verification
 
-- `python -m compileall` / import smoke test after changes.
-- `python -m unittest discover -s tests -q` — the offline suite.
-- Server must start and register tools with no engines, models, or keys
-  present (clear errors on use, no network required at startup).
-- Local engines must work offline once their models/voices are cached. Live
-  calls are manual smoke (script or a real MCP call through the harness), not
-  part of the suite.
+- `python -m unittest discover -s tests -q` — the offline suite (60 tests,
+  zero dev deps; must stay green).
+- `python scripts/mcp_smoke.py` — spawns the server over stdio and exercises
+  all four tools; `listen` is expected to fail with a clear tkinter error on
+  hosts without `tk`.
+- `python scripts/live_smoke.py` — real piper → faster-whisper → aplay
+  round-trip (weights cached under `~/.cache/listen-n-speak`).
+- Never pass a file path to faster-whisper: PyAV 14+ renamed `av.open`'s
+  `metadata_errors`, so file decoding fails on 1.2.1. Feed the numpy array
+  from `_read_wav_samples` (canonical 16 kHz mono WAV).

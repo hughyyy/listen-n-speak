@@ -24,6 +24,29 @@ class SttError(RuntimeError):
     """User-facing transcription failure."""
 
 
+def _read_wav_samples(wav: Path):
+    """Read a canonical 16 kHz mono WAV into float32 samples (-1..1).
+
+    faster-whisper decodes file paths through PyAV, whose `av.open` signature
+    changed in PyAV 14+; passing a numpy array skips that decode path
+    entirely. Our normalizer guarantees the 16 kHz mono format.
+    """
+    import wave
+
+    import numpy as np
+
+    try:
+        with wave.open(str(wav), "rb") as handle:
+            if handle.getnchannels() != 1 or handle.getframerate() != 16000:
+                raise SttError(
+                    "expected 16 kHz mono WAV input (audio normalizer guarantees this)"
+                )
+            frames = handle.readframes(handle.getnframes())
+    except (OSError, wave.Error) as exc:
+        raise SttError(f"cannot read WAV input: {exc}") from exc
+    return np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+
+
 def _faster_whisper(
     cfg: Config, wav: Path, language: str | None, model: str | None
 ) -> dict:
@@ -43,10 +66,13 @@ def _faster_whisper(
     whisper = _MODEL_CACHE[name]
 
     try:
+        samples = _read_wav_samples(wav)
         segments, info = whisper.transcribe(
-            str(wav), language=language or None, vad_filter=False
+            samples, language=language or None, vad_filter=False
         )
         text = " ".join(segment.text.strip() for segment in segments).strip()
+    except SttError:
+        raise
     except Exception as exc:
         raise SttError(f"faster-whisper failed: {exc}") from exc
 

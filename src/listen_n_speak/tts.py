@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 import subprocess
 import uuid
@@ -257,6 +258,21 @@ def _default_voice(engine: str) -> str | None:
     }.get(engine)
 
 
+def _playback_env() -> dict[str, str]:
+    """Environment for audio playback.
+
+    Some MCP clients spawn servers with a whitelisted environment that drops
+    `XDG_RUNTIME_DIR`; aplay then cannot reach PipeWire/PulseAudio ("Host is
+    down"). Restore the per-user runtime dir when it is absent.
+    """
+    env = os.environ.copy()
+    if "XDG_RUNTIME_DIR" not in env:
+        candidate = Path(f"/run/user/{os.getuid()}")
+        if candidate.is_dir():
+            env["XDG_RUNTIME_DIR"] = str(candidate)
+    return env
+
+
 def play_file(path: Path) -> tuple[bool, str | None]:
     """Play an audio file on the host sink (blocking). Best-effort."""
     for exe in ("aplay", "ffplay"):
@@ -268,7 +284,7 @@ def play_file(path: Path) -> tuple[bool, str | None]:
             if exe == "aplay"
             else [found, "-nodisp", "-autoexit", "-loglevel", "error", str(path)]
         )
-        proc = subprocess.run(args, capture_output=True, text=True)
+        proc = subprocess.run(args, capture_output=True, text=True, env=_playback_env())
         if proc.returncode == 0:
             return True, None
         detail = (proc.stderr or proc.stdout).strip()[:300] or f"{exe} exited {proc.returncode}"
