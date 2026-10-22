@@ -112,6 +112,10 @@ needs `"timeout": 600000` (human-paced dialog); core runs fine at defaults.
   `format=mp3|ogg|flac` on `speak`/`synthesize` transcodes via ffmpeg when it
   differs from the engine's native output. Dialog recordings stay WAV
   16 kHz mono — internal artifacts, never surfaced.
+- Language policy: `language` on `transcribe` passes through to the engine
+  (auto-detect by default). The shipped, benchmarked voice catalog is
+  English-only. Other languages pass through untested — STT by param, TTS by
+  naming any installed voice — supported plumbing, unadvertised quality.
 - Every tool returns structured output the calling model can act on (JSON
   where it matters, not prose-only) — house rule.
 
@@ -212,6 +216,4 @@ tokens from OMP's credential store — same recipe as look-n-see):
 
 ## Open design questions (gating the spec)
 
-1. **Language policy** — English-only catalog in v1, or multilingual param
-   surface from day one?
-2. **Non-goals** — confirm the list above as v1 non-goals.
+1. **Non-goals** — confirm the list above as v1 non-goals.
