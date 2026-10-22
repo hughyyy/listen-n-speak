@@ -44,6 +44,8 @@ of README gate the spec; resolve them with the user before implementing.
   with the user first. When implementation starts, create `BRIEF.md`
   (requirements) and `IMPLEMENTATION.md` (design + release plan) like
   look-n-see, and keep them in sync with decisions made during implementation.
+- Requirements questions go to the user one at a time, each framed with its
+  problem context, options, and recommendation — never batched.
 - One commit per logical change; conventional commits, imperative subject.
   Docs-only changes say so.
 
