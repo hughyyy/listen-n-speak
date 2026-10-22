@@ -170,8 +170,9 @@ never touches tkinter, parecord, or capture.
 
 **Deferred to post-v1** — mirror look-n-see / scrape-n-search (CI + tag-
 triggered GitHub release + PyPI trusted publishing) once the surface
-stabilizes. Nothing published or configured yet; `LICENSE` choice pending
-user decision, like look-n-see's.
+stabilizes; `LICENSE` choice pending user decision, like look-n-see's.
+GitHub repo: `github.com/hughyyy/listen-n-speak` — exists (2026-10-22);
+nothing published to PyPI.
 
 ## Verification
 

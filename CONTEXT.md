@@ -28,6 +28,16 @@ _Avoid_: STT (internal acronym), speech-to-text, recognition, ASR
 One pass of text-to-speech: text in, an utterance out.
 _Avoid_: TTS (internal acronym), text-to-speech, generation, rendering
 
+### Interaction
+
+**Dialog**:
+The small human-in-the-loop window `listen` opens on the host display: the agent's prompt, a red record button, a live-typed response box, Clear and Send. One dialog per listen call, run as a subprocess.
+_Avoid_: prompt (the agent's text inside it), window (too generic), session
+
+**Dismissal**:
+Ending a dialog without sending — closing the window. Returns a structured not-an-error result (`{"text": null, "reason": "dismissed"}`).
+_Avoid_: cancel (the agent has no cancel verb), abort
+
 ### Machinery
 
 **Engine**:

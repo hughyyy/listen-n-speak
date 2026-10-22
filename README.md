@@ -16,17 +16,19 @@ dialog where the human answers the agent by voice. Fourth in the collection —
 
 An agent inside a harness receives audio the way it receives images — a file
 path, a base64 `data:` URI, or a URL — and has no microphone or speaker of its
-own. listen-n-speak closes that gap with three verbs:
+own. listen-n-speak closes that gap with four verbs:
 
 - **transcribe** — hand it audio (a user's voice memo, a recording, a call
   excerpt) and get back text the calling model can act on.
 - **speak** — hand it text and the host says it out loud for the human present
   (and/or returns an audio file).
+- **synthesize** — the same synthesis without playback: an utterance file
+  path, no sink required (headless-safe).
 - **listen** — open a dialog on the host's display; the human speaks an answer,
   and the agent receives the transcript. The agent supplies a text prompt that
   is displayed in the window, so the human always knows what is being asked.
 
-All three are engine-pluggable, the same pattern as look-n-see's OCR engines:
+All four are engine-pluggable, the same pattern as look-n-see's OCR engines:
 one engine per call, an env-configured default, a fallback chain on failure.
 Local engines work offline; cloud engines degrade to clear errors without keys.
 
@@ -39,8 +41,9 @@ that results arrive as JSON, not prose. Harness realities that shape the
 surface:
 
 - OMP's default MCP request timeout is 30 s (look-n-see raises it to 120 s).
-  `transcribe`/`speak` stay fast; `listen` is human-paced and needs a long
-  registration timeout (see the variant table).
+  `transcribe`/`synthesize` stay fast; `speak` blocks for the playback
+  duration; `listen` is human-paced and needs a long registration timeout
+  (see the variant table).
 - Tools are one-shot request/response. No streaming, no sessions.
 - Return file paths and metadata, never base64 audio blobs — audio in context
   is a pure token tax.
