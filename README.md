@@ -93,15 +93,19 @@ needs `"timeout": 600000` (human-paced dialog); core runs fine at defaults.
 | Tool | Params | Returns |
 | --- | --- | --- |
 | `transcribe` | `audio` (required: path / data URI / URL), `engine`?, `language`?, `model`? | `{"text", "language", "duration_s", "engine"}` |
-| `speak` | `text` (required), `engine`?, `voice`?, `play`? | `{"file", "played", "duration_s", "engine", "voice"}` |
+| `speak` | `text` (required), `engine`?, `voice`? | `{"file", "played", "duration_s", "engine", "voice"}` — synthesis + playback; blocks until finished |
+| `synthesize` | `text` (required), `engine`?, `voice`? | `{"file", "duration_s", "engine", "voice"}` — synthesis without playback; no sink required |
 | `listen` | `prompt` (required), `silence_s`? (default 5), `max_s`? (default 300), `engine`? | `{"text", "audio", "duration_s", "engine"}`; dismissal returns `{"text": null, "reason": "dismissed"}` |
 
 - `transcribe` normalizes input exactly like look-n-see normalizes images,
   then probes via `ffprobe` and converts through `ffmpeg` to one canonical
   form (16 kHz mono) before handing to an engine.
-- `speak` synthesizes to a file under a configurable output dir, then plays it
-  through the host audio sink when asked. Playback is best-effort: no sink →
+- `speak` synthesizes to a file under a configurable output dir, then plays
+  it through the host audio sink; the call blocks until playback finishes so
+  consecutive utterances stay ordered. Playback is best-effort: no sink →
   clear error, file still returned.
+- `synthesize` is the same synthesis without playback — no sink required, so
+  it works on every variant including headless hosts.
 - Every tool returns structured output the calling model can act on (JSON
   where it matters, not prose-only) — house rule.
 

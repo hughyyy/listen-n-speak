@@ -37,3 +37,7 @@ _Avoid_: backend, provider, model (an engine has a model; it is not one)
 **Voice**:
 The persona a synthesis engine speaks with — a Piper voice file, an Edge voice name, or a cloud voice id. Engine-specific and not portable across engines.
 _Avoid_: model, speaker, persona
+
+**Playback**:
+Sounding an utterance through the host's audio sink — best-effort, for the human present; agents never hear audio. `speak` includes playback; `synthesize` never does.
+_Avoid_: playing (an agent action), output, stream
