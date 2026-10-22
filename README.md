@@ -8,10 +8,9 @@ dialog where the human answers the agent by voice. Fourth in the collection —
 (web), [store-n-recall](../store-n-recall) (project memory), listen-n-speak
 (speech).
 
-> **Status: planned** — design captured, implementation not started. This
-> README is the draft spec; the open design questions at the bottom gate the
-> final surface. When implementation starts, `BRIEF.md` (requirements) and
-> `IMPLEMENTATION.md` (design + release plan) are added, like look-n-see.
+> **Status: design settled (2026-10-22)** — all open questions resolved with
+> the user; requirements live in `BRIEF.md`, design + release plan in
+> `IMPLEMENTATION.md`. Implementation not started.
 
 ## The idea
 
@@ -90,7 +89,7 @@ look-n-see:
 the extras and the dialog are additive. OMP registration for the full variant
 needs `"timeout": 600000` (human-paced dialog); core runs fine at defaults.
 
-## Draft tool surface
+## Tool surface
 
 | Tool | Params | Returns |
 | --- | --- | --- |
@@ -119,7 +118,7 @@ needs `"timeout": 600000` (human-paced dialog); core runs fine at defaults.
 - Every tool returns structured output the calling model can act on (JSON
   where it matters, not prose-only) — house rule.
 
-## Draft engines
+## Engines
 
 | Direction | Engine | How | Needs |
 | --- | --- | --- | --- |
@@ -158,7 +157,7 @@ they are relied on:
 Results land as a summary table in this README. The benchmark suite is
 manual/scripted and is not part of the offline unittest suite.
 
-## Configuration (draft)
+## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -170,7 +169,7 @@ manual/scripted and is not part of the offline unittest suite.
 | `LISTEN_N_SPEAK_INPUT` | system default | which microphone the dialog records |
 | `TRANSCRIBE_ENABLED` / `SPEAK_ENABLED` / `LISTEN_ENABLED` | `1` | tool registration gates (release variants) |
 
-Full set finalized after the open questions are answered.
+Finalized 2026-10-22 — all open design questions resolved with the user.
 
 ## Install
 
@@ -204,16 +203,14 @@ tokens from OMP's credential store — same recipe as look-n-see):
 
 ## Non-goals
 
-- No protocol-level streaming (websocket/SSE), no barge-in, no server-side
-  session state — MCP here stays one-shot request/response. The only VAD-like
-  feature is the dialog's silence auto-stop, local to the dialog process.
+- No protocol-level streaming across the MCP boundary — tool calls stay
+  request/response over stdio; streaming may exist inside a process (the
+  dialog's live transcription) but never crosses the protocol. Escape hatch
+  if agent-side partials ever matter: a polling trio (start/status/stop),
+  not a transport change.
 - No diarization, no word-level timestamps in v1 (engines may offer them; the
   tool schema does not expose them yet).
 - No duplex real-time voice loop — the dialog is the human-in-the-loop answer,
   and it is still one-shot from the agent's side.
 - No speech translation, no audio-conversion tool surface (ffmpeg exists on
   the host; agents can be told to use it directly).
-
-## Open design questions (gating the spec)
-
-1. **Non-goals** — confirm the list above as v1 non-goals.

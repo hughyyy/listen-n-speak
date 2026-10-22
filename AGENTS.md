@@ -2,12 +2,12 @@
 
 ## Project
 
-MCP server giving agents speech I/O: transcription (audio → text) and
-synthesis (text → audio). Fourth in the collection (look-n-see,
-scrape-n-search, store-n-recall). **Status: design captured, implementation
-not started** — the design lives in `README.md` (draft tool surface, engines,
-config) and `CONTEXT.md` (vocabulary). The open design questions at the bottom
-of README gate the spec; resolve them with the user before implementing.
+MCP server giving agents speech I/O: transcription (audio → text), synthesis
+(text → audio), and a human-in-the-loop listening dialog. Fourth in the
+collection (look-n-see, scrape-n-search, store-n-recall). **Status:
+requirements settled 2026-10-22; implementation not started** — requirements
+in `BRIEF.md`, design + phased plan in `IMPLEMENTATION.md`, user-facing
+surface in `README.md`, vocabulary in `CONTEXT.md`.
 
 ## Conventions
 
@@ -29,10 +29,9 @@ of README gate the spec; resolve them with the user before implementing.
   Python ≤3.13; this workstation has only 3.14) — never built or tested in-VM.
 - Every tool returns structured output the calling model can act on (JSON
   where it matters, not prose-only).
-- Tool surface stays minimal (`transcribe`, `speak` as the draft core; `listen`
-  reserved for a mic-capture tool). A new tool needs a README row and a reason
-  it cannot be a param; a new engine or env var needs a README update in the
-  same change.
+- Tool surface stays minimal: `transcribe`, `speak`, `synthesize`, `listen`.
+  A new tool needs a README row and a reason it cannot be a param; a new
+  engine or env var needs a README update in the same change.
 - OMP's default MCP request timeout is 30 s — no tool call may block for
   minutes; long captures must be capped or moved out of the call.
 - Config via environment variables (`LISTEN_N_SPEAK_*`) with sane defaults;
@@ -44,10 +43,10 @@ of README gate the spec; resolve them with the user before implementing.
 
 ## Workflow
 
-- The design in `README.md` is the draft spec. Open questions are resolved
-  with the user first. When implementation starts, create `BRIEF.md`
-  (requirements) and `IMPLEMENTATION.md` (design + release plan) like
-  look-n-see, and keep them in sync with decisions made during implementation.
+- `BRIEF.md` (requirements) and `IMPLEMENTATION.md` (design + phased plan)
+  are the spec of record, settled with the user 2026-10-22; keep both in
+  sync with decisions made during implementation, and keep README matching
+  the shipped surface.
 - Requirements questions go to the user one at a time, each framed with its
   problem context, options, and recommendation — never batched.
 - Engine defaults are set from benchmark evidence (see Benchmarks in README),
