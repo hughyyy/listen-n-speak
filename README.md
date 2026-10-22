@@ -2,7 +2,8 @@
 
 A lightweight [MCP](https://modelcontextprotocol.io) server that gives agents
 **ears** and a **mouth**: **transcribe** turns audio into text (STT), **speak**
-turns text into audio the human can hear (TTS). Fourth in the collection —
+turns text into audio the human can hear (TTS), and **listen** opens a small
+dialog where the human answers the agent by voice. Fourth in the collection —
 [look-n-see](../look-n-see) (vision/OCR), [scrape-n-search](../scrape-n-search)
 (web), [store-n-recall](../store-n-recall) (project memory), listen-n-speak
 (speech).
@@ -16,31 +17,76 @@ turns text into audio the human can hear (TTS). Fourth in the collection —
 
 An agent inside a harness receives audio the way it receives images — a file
 path, a base64 `data:` URI, or a URL — and has no microphone or speaker of its
-own. listen-n-speak closes that gap with two verbs:
+own. listen-n-speak closes that gap with three verbs:
 
 - **transcribe** — hand it audio (a user's voice memo, a recording, a call
   excerpt) and get back text the calling model can act on.
 - **speak** — hand it text and the host says it out loud for the human present
   (and/or returns an audio file).
+- **listen** — open a dialog on the host's display; the human speaks an answer,
+  and the agent receives the transcript. The agent supplies a text prompt that
+  is displayed in the window, so the human always knows what is being asked.
 
-Both directions are engine-pluggable, the same pattern as look-n-see's OCR
-engines: one engine per call, an env-configured default, a fallback chain on
-failure. Local engines work offline; cloud engines degrade to clear errors
-without keys.
+All three are engine-pluggable, the same pattern as look-n-see's OCR engines:
+one engine per call, an env-configured default, a fallback chain on failure.
+Local engines work offline; cloud engines degrade to clear errors without keys.
 
 ## How an agent uses this from a harness
 
 The calling model only ever sees the tool descriptions, so those descriptions
 are the contract — they must teach the model the input triple (path / data URI
-/ URL), the fact that it cannot hear playback (playback is for the human
-present), and that results arrive as JSON, not prose. Harness realities that
-shape the surface:
+/ URL), that it cannot hear playback (playback is for the human present), and
+that results arrive as JSON, not prose. Harness realities that shape the
+surface:
 
 - OMP's default MCP request timeout is 30 s (look-n-see raises it to 120 s).
-  No tool call may block for minutes; in-call mic recording needs a hard cap.
+  `transcribe`/`speak` stay fast; `listen` is human-paced and needs a long
+  registration timeout (see the variant table).
 - Tools are one-shot request/response. No streaming, no sessions.
 - Return file paths and metadata, never base64 audio blobs — audio in context
   is a pure token tax.
+
+## The `listen` dialog
+
+A small window on the host display (X11 today; tkinter, stdlib — one-time
+`pacman -S tk` fixes the missing `libtk8.6.so`). The dialog process is spawned
+per call so a GUI crash never takes down the server, and the server stays
+stateless.
+
+1. The agent calls `listen` with a required `prompt` — the question to show.
+2. The window shows the prompt. **Recording does not start until the human
+   clicks the red record button.**
+3. While recording, words are live-transcribed and typed into a response box
+   as they arrive (when a streaming-capable local engine is present).
+4. Recording auto-stops after **5 seconds of silence** (`silence_s` param,
+   default 5; absolute cap `max_s`, default 300).
+5. The human then either **Clear** (empty the box, record again) or **Send**
+   (return the transcript to the calling agent). Closing the window counts as
+   a dismissal.
+
+Graceful degradation: with no local streaming engine the dialog records with
+silence detection via ffmpeg levels and batch-transcribes at the end (cloud
+engines usable; live typing becomes a "recording…" state); with no capture
+device it errors clearly. The result carries the transcript, the saved audio
+path, and duration — the audio is kept so the agent can re-transcribe with a
+different engine if needed.
+
+## Release variants
+
+One package; the tool surface is selected at startup by env flags
+(`tools/list` advertises exactly what is registered) — same mechanism as
+look-n-see:
+
+| Variant | Install | Env |
+| --- | --- | --- |
+| **Full (default)** | `pip install 'listen-n-speak[stt,tts]'` | *(defaults)* |
+| **Core (file-based only)** | `pip install listen-n-speak` | `LISTEN_ENABLED=0` — no dialog, no capture device, no GUI deps |
+| STT only | `pip install 'listen-n-speak[stt]'` | `SPEAK_ENABLED=0` |
+| TTS only | `pip install 'listen-n-speak[tts]'` | `TRANSCRIBE_ENABLED=0` |
+
+`LISTEN_ENABLED=0` is the "pure (A)" configuration the collection starts with;
+the extras and the dialog are additive. OMP registration for the full variant
+needs `"timeout": 600000` (human-paced dialog); core runs fine at defaults.
 
 ## Draft tool surface
 
@@ -48,6 +94,7 @@ shape the surface:
 | --- | --- | --- |
 | `transcribe` | `audio` (required: path / data URI / URL), `engine`?, `language`?, `model`? | `{"text", "language", "duration_s", "engine"}` |
 | `speak` | `text` (required), `engine`?, `voice`?, `play`? | `{"file", "played", "duration_s", "engine", "voice"}` |
+| `listen` | `prompt` (required), `silence_s`? (default 5), `max_s`? (default 300), `engine`? | `{"text", "audio", "duration_s", "engine"}`; dismissal returns `{"text": null, "reason": "dismissed"}` |
 
 - `transcribe` normalizes input exactly like look-n-see normalizes images,
   then probes via `ffprobe` and converts through `ffmpeg` to one canonical
@@ -55,8 +102,6 @@ shape the surface:
 - `speak` synthesizes to a file under a configurable output dir, then plays it
   through the host audio sink when asked. Playback is best-effort: no sink →
   clear error, file still returned.
-- `listen` is the reserved name for a mic-capture tool if one is added (open
-  question 1) — never reused for anything else.
 - Every tool returns structured output the calling model can act on (JSON
   where it matters, not prose-only) — house rule.
 
@@ -64,25 +109,28 @@ shape the surface:
 
 | Direction | Engine | How | Needs |
 | --- | --- | --- | --- |
-| STT | local faster-whisper | CTranslate2, CPU; models cached under XDG cache | `[stt]` extra; Python 3.14 wheel support to verify |
+| STT | local faster-whisper | CTranslate2, CPU; models cached under XDG cache; Silero VAD for the dialog's silence stop | `[stt]` extra; Python 3.14 wheel support to verify |
 | STT | cloud Groq | OpenAI-compatible `/audio/transcriptions`, `whisper-large-v3-turbo` | `GROQ_API_KEY` |
 | TTS | local Piper | piper-tts + onnxruntime, per-language voice files | `[tts]` extra; voice download on first use |
 | TTS | cloud Edge TTS | free Microsoft neural voices, no key, unofficial | network |
 | TTS | espeak-ng | system binary, robotic, zero deps | pacman install |
 
 Selection per call via `engine=`, default via env, fallback chain after
-failure — identical semantics to look-n-see's OCR dispatcher.
+failure — identical semantics to look-n-see's OCR dispatcher. Live typing in
+the `listen` dialog requires a streaming-capable local engine (faster-whisper
+chunked transcription); cloud engines only serve batch transcription.
 
 ## Configuration (draft)
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `LISTEN_N_SPEAK_STT_ENGINE` | cloud default | default STT engine |
-| `LISTEN_N_SPEAK_TTS_ENGINE` | local default | default TTS engine |
+| `LISTEN_N_SPEAK_STT_ENGINE` | — | default STT engine |
+| `LISTEN_N_SPEAK_TTS_ENGINE` | — | default TTS engine |
 | `LISTEN_N_SPEAK_STT_FALLBACKS` | engine-dependent | fallback chain tried after the default fails |
 | `LISTEN_N_SPEAK_TTS_FALLBACKS` | engine-dependent | same, for synthesis |
-| `LISTEN_N_SPEAK_OUTPUT_DIR` | XDG cache or tmp | where synthesized files land |
-| `LISTEN_N_SPEAK_INPUT` | system default | audio capture source (if mic capture is added) |
+| `LISTEN_N_SPEAK_OUTPUT_DIR` | XDG cache or tmp | where synthesized/captured files land |
+| `LISTEN_N_SPEAK_INPUT` | system default | capture source for the dialog |
+| `TRANSCRIBE_ENABLED` / `SPEAK_ENABLED` / `LISTEN_ENABLED` | `1` | tool registration gates (release variants) |
 
 Full set finalized after the open questions are answered.
 
@@ -93,7 +141,7 @@ Collection parity: Python 3.10+, venv, `pip install -e .`, console script
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e .
+.venv/bin/pip install -e '.[stt,tts]'
 
 # run as a stdio MCP server
 .venv/bin/listen-n-speak
@@ -110,34 +158,33 @@ tokens from OMP's credential store — same recipe as look-n-see):
     "listen-n-speak": {
       "type": "stdio",
       "command": "/absolute/path/to/listen-n-speak/.venv/bin/listen-n-speak",
-      "timeout": 120000
+      "timeout": 600000
     }
   }
 }
 ```
 
-## Non-goals (draft)
+## Non-goals
 
-- No streaming/websocket transport, no VAD turn detection, no barge-in — the
-  MCP surface here is one-shot request/response.
+- No protocol-level streaming (websocket/SSE), no barge-in, no server-side
+  session state — MCP here stays one-shot request/response. The only VAD-like
+  feature is the dialog's silence auto-stop, local to the dialog process.
 - No diarization, no word-level timestamps in v1 (engines may offer them; the
   tool schema does not expose them yet).
-- No duplex real-time voice loop — that is a harness/skill concern; this
-  server stays one-shot: audio in → text, text → audio.
+- No duplex real-time voice loop — the dialog is the human-in-the-loop answer,
+  and it is still one-shot from the agent's side.
 - No speech translation, no audio-conversion tool surface (ffmpeg exists on
   the host; agents can be told to use it directly).
 
 ## Open design questions (gating the spec)
 
-1. **STT input** — file/URI/URL only, or also a mic-capture tool on the host
-   (capped duration), or a start/stop recording pair for long dictation?
-2. **STT default engine** — cloud-first (Groq), offline-first
-   (faster-whisper), or pluggable with cloud default?
-3. **TTS default engine** — Piper (offline), Kokoro (quality), Edge TTS
+1. **STT default engine** — offline-first (faster-whisper), cloud-first
+   (Groq), or pluggable with one as default?
+2. **TTS default engine** — Piper (offline), Kokoro (quality), Edge TTS
    (no-key cloud), cloud API (keyed), or espeak-ng (zero-dep fallback)?
-4. **`speak` delivery** — synthesize + play, synthesize-only, or both tools?
-5. **Capture source** — host mic, monitor (what the machine plays), both?
-6. **Formats** — WAV-only policy, or WAV default + optional mp3/ogg via ffmpeg?
-7. **Language policy** — English-only catalog in v1, or multilingual param
+3. **`speak` delivery** — synthesize + play, synthesize-only, or both tools?
+4. **Capture source** — host mic, monitor (what the machine plays), both?
+5. **Formats** — WAV-only policy, or WAV default + optional mp3/ogg via ffmpeg?
+6. **Language policy** — English-only catalog in v1, or multilingual param
    surface from day one?
-8. **Non-goals** — confirm the list above as v1 non-goals.
+7. **Non-goals** — confirm the list above as v1 non-goals.
