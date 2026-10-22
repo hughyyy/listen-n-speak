@@ -24,6 +24,9 @@ of README gate the spec; resolve them with the user before implementing.
 - Engine pluggability follows look-n-see's OCR pattern: engine param per call,
   env-configured default, fallback chain; a missing engine/model/key degrades
   to a clear error, never a traceback.
+- Kokoro is deferred: no adapter in v1. `scripts/download-kokoro-model.sh`
+  fetches its weights for evaluation outside this VM (kokoro-onnx supports
+  Python ≤3.13; this workstation has only 3.14) — never built or tested in-VM.
 - Every tool returns structured output the calling model can act on (JSON
   where it matters, not prose-only).
 - Tool surface stays minimal (`transcribe`, `speak` as the draft core; `listen`

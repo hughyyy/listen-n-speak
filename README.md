@@ -113,7 +113,9 @@ needs `"timeout": 600000` (human-paced dialog); core runs fine at defaults.
 | STT | cloud Groq | OpenAI-compatible `/audio/transcriptions`, `whisper-large-v3-turbo` | `GROQ_API_KEY` |
 | TTS | local Piper | piper-tts + onnxruntime, per-language voice files | `[tts]` extra; voice download on first use |
 | TTS | cloud Edge TTS | free Microsoft neural voices, no key, unofficial | network |
+| TTS | cloud OpenAI-compatible | generic `/audio/speech` adapter — OpenAI, Groq PlayAI, or any compatible endpoint | `LISTEN_N_SPEAK_TTS_BASE_URL` + `LISTEN_N_SPEAK_TTS_API_KEY` |
 | TTS | espeak-ng | system binary, robotic, zero deps | pacman install |
+| TTS | local Kokoro (deferred) | **not implemented in v1** — weights via `scripts/download-kokoro-model.sh`, to be evaluated **outside this VM** (kokoro-onnx supports Python ≤3.13; this VM has only 3.14) | future candidate |
 
 Selection per call via `engine=`, default via env, fallback chain after
 failure — identical semantics to look-n-see's OCR dispatcher. Live typing in
@@ -136,7 +138,8 @@ they are relied on:
   reliability at the 5 s threshold.
 - **TTS**: synthesis latency, output size, and a human listening ranking on a
   fixed set of sample texts (announcement, technical sentence with code-like
-  tokens, paragraph).
+  tokens, paragraph). Kokoro is benchmarked only after its weights are
+  evaluated outside this VM (see `scripts/download-kokoro-model.sh`).
 
 Results land as a summary table in this README. The benchmark suite is
 manual/scripted and is not part of the offline unittest suite.
@@ -199,12 +202,9 @@ tokens from OMP's credential store — same recipe as look-n-see):
 
 ## Open design questions (gating the spec)
 
-1. **TTS engine slate** — which engines to implement and benchmark for v1
-   (Piper, Kokoro, Edge TTS, keyed cloud API, espeak-ng); the default is set
-   by benchmark results, not by me.
-2. **`speak` delivery** — synthesize + play, synthesize-only, or both tools?
-3. **Capture source** — host mic, monitor (what the machine plays), both?
-4. **Formats** — WAV-only policy, or WAV default + optional mp3/ogg via ffmpeg?
-5. **Language policy** — English-only catalog in v1, or multilingual param
+1. **`speak` delivery** — synthesize + play, synthesize-only, or both tools?
+2. **Capture source** — host mic, monitor (what the machine plays), both?
+3. **Formats** — WAV-only policy, or WAV default + optional mp3/ogg via ffmpeg?
+4. **Language policy** — English-only catalog in v1, or multilingual param
    surface from day one?
-6. **Non-goals** — confirm the list above as v1 non-goals.
+5. **Non-goals** — confirm the list above as v1 non-goals.
